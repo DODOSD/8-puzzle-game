@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8 Puzzle Slider</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .video-background::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3); /* Overlay to make the game more visible */
+        }
+
+        .video-background video {
+            position: absolute;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+        }
+
+        .audio-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .audio-controls button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            padding: 0;
+        }
+
+        .audio-controls .volume-slider {
+            width: 100px;
+            margin: 0 10px;
+        }
+
+        @media (max-width: 480px) {
+            .audio-controls {
+                top: auto;
+                bottom: 20px;
+                right: 50%;
+                transform: translateX(50%);
+            }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: clamp(15px, 4vw, 30px);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 95%;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+            font-size: clamp(20px, 5vw, 32px);
+        }
+
+        .game-stats {
+            display: flex;
+            justify-content: center;
+            gap: clamp(10px, 3vw, 20px);
+            margin-bottom: 20px;
+            color: #666;
+            font-size: clamp(16px, 4vw, 18px);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: #f8f9fa;
+            padding: 8px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .moves, .timer {
+            font-weight: bold;
+            color: #2C3E50;
+        }
+
+        .puzzle {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(8px, 2vw, 12px);
+            margin: 20px auto;
+            background: #f0f0f0;
+            padding: clamp(10px, 3vw, 20px);
+            border-radius: 10px;
+            width: 100%;
+            aspect-ratio: 1;
+            max-width: 500px;
+            max-height: 500px;
+        }
+
+        .tile {
+            background: #3498DB;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: clamp(24px, 8vw, 48px);
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s, background-color 0.2s;
+            aspect-ratio: 1;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tile:not(.empty):hover {
+            transform: scale(1.05);
+            background: #2980B9;
+        }
+
+        .empty {
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        .controls {
+            display: flex;
+            gap: clamp(8px, 2vw, 15px);
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: clamp(8px, 2vw, 12px) clamp(15px, 4vw, 25px);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: clamp(14px, 4vw, 18px);
+            transition: background-color 0.2s, transform 0.1s;
+            touch-action: manipulation;
+        }
+
+        button:hover {
+            background: #34495E;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .win-message {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: clamp(20px, 5vw, 40px);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            animation: popIn 0.3s ease-out;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .win-message h2 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+            font-size: clamp(20px, 5vw, 28px);
+        }
+
+        .win-message p {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: clamp(16px, 4vw, 18px);
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+        }
+
+        @media (hover: none) {
+            .tile:not(.empty):active {
+                transform: scale(1.05);
+                background: #2980B9;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .game-stats {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+        }
+    </style>
+    <!-- Add confetti canvas styles -->
+    <style>
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 99;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-background">
+        <video autoplay muted loop playsinline id="backgroundVideo">
+            <!-- Replace this with your video file -->
+            <source src="Video/video bac.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <div class="container">
+        <h1>8 Puzzle Slider</h1>
+        <div class="game-stats">
+            <div class="stat">  
+                Moves: <span class="moves">0</span>
+            </div>
+            <div class="stat">
+                Time: <span class="timer">00:00</span>
+            </div>
+        </div>
+        <div class="puzzle"></div>
+        <div class="controls">
+            <button onclick="newGame()">New Game</button>
+            <button onclick="shuffleCurrent()">Shuffle</button>
+        </div>
+    </div>
+    <div class="win-message">
+        <h2>Congratulations! 🎉</h2>
+        <p>You solved the puzzle in <span class="final-moves"></span> moves!</p>
+        <p>Time: <span class="final-time"></span></p>
+        <button onclick="hideWinMessage()">Play Again</button>
+    </div>
+    <div class="overlay"></div>
+    <canvas id="confetti-canvas"></canvas>
+    
+    <div class="audio-controls">
+        <button id="toggleMusic">♫</button>
+        <button id="toggleVideo">🔇</button>
+        <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="50">
+        <span id="volumeIcon">🔊</span>
+    </div>
+
+    <audio id="backgroundMusic" loop>
+        <!-- Replace these URLs with your actual music files -->
+        <source src="Music/yes.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <audio id="moveSoundEffect">
+        <!-- Replace this URL with your actual sound effect file -->
+        <source src="Music/pop.mp3" type="audio/mpeg">
+    </audio>
+
+    <audio id="winSoundEffect">
+        <!-- Replace this URL with your actual win sound effect file -->
+        <source src="Music/Win sound 7 sec.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let tiles = [];
+        let emptyTile = 8;
+        let moves = 0;
+        let timerInterval;
+        let seconds = 0;
+        let gameActive = false;
+        let firstMove = true;
+        let isMusicPlaying = false;
+        let isVideoMuted = true;
+        let confetti = null;
+        
+        const puzzle = document.querySelector('.puzzle');
+        const movesDisplay = document.querySelector('.moves');
+        const timerDisplay = document.querySelector('.timer');
+        const winMessage = document.querySelector('.win-message');
+        const overlay = document.querySelector('.overlay');
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            if (!firstMove) return;
+            
+            firstMove = false;
+            seconds = 0;
+            timerDisplay.textContent = formatTime(seconds);
+            timerInterval = setInterval(() => {
+                seconds++;
+                timerDisplay.textContent = formatTime(seconds);
+            }, 1000);
+            gameActive = true;
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            gameActive = false;
+        }
+
+        function createTiles() {
+            tiles = Array.from({length: 8}, (_, i) => i + 1);
+            tiles.push(null); // Empty tile
+            puzzle.innerHTML = '';
+            
+            tiles.forEach((num, index) => {
+                const tile = document.createElement('div');
+                tile.className = `tile ${num === null ? 'empty' : ''}`;
+                tile.textContent = num !== null ? num : '';
+                tile.addEventListener('click', () => handleTileClick(index));
+                puzzle.appendChild(tile);
+            });
+        }
+
+        function handleTileClick(index) {
+            const adjacentTiles = getAdjacentTiles(index);
+            const emptyIndex = tiles.indexOf(null);
+            
+            if (adjacentTiles.includes(emptyIndex)) {
+                if (firstMove) {
+                    startTimer();
+                }
+                moveTile(index);
+            }
+        }
+
+        function getAdjacentTiles(index) {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            const adjacent = [];
+
+            if (row > 0) adjacent.push(index - 3); // Up
+            if (row < 2) adjacent.push(index + 3); // Down
+            if (col > 0) adjacent.push(index - 1); // Left
+            if (col < 2) adjacent.push(index + 1); // Right
+
+            return adjacent;
+        }
+
+        function shuffle() {
+            let shuffled;
+            do {
+                shuffled = [...Array(8).keys()].map(x => x + 1);
+                shuffled.push(null);
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+            } while (!isSolvable(shuffled));
+
+            tiles = shuffled;
+            emptyTile = tiles.indexOf(null);
+            updateTiles();
+        }
+
+        function shuffleCurrent() {
+            shuffle();
+            resetGameState();
+        }
+
+        function resetGameState() {
+            stopTimer();
+            moves = 0;
+            movesDisplay.textContent = moves;
+            firstMove = true;
+            gameActive = false;
+        }
+
+        function isSolvable(puzzle) {
+            let inversions = 0;
+            const puzzleWithoutEmpty = puzzle.filter(x => x !== null);
+            
+            for (let i = 0; i < puzzleWithoutEmpty.length - 1; i++) {
+                for (let j = i + 1; j < puzzleWithoutEmpty.length; j++) {
+                    if (puzzleWithoutEmpty[i] > puzzleWithoutEmpty[j]) {
+                        inversions++;
+                    }
+                }
+            }
+            
+            return inversions % 2 === 0;
+        }
+
+        function updateTiles() {
+            const tileElements = puzzle.children;
+            tiles.forEach((num, index) => {
+                tileElements[index].className = `tile ${num === null ? 'empty' : ''}`;
+                tileElements[index].textContent = num === null ? '' : num;
+            });
+        }
+
+        function moveTile(index) {
+            const emptyIndex = tiles.indexOf(null);
+            if (!isMovable(index)) return;
+
+            [tiles[index], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[index]];
+            emptyTile = index;
+            moves++;
+            movesDisplay.textContent = moves;
+            
+            updateTiles();
+            
+            if (isWin()) {
+                stopTimer();
+                setTimeout(showWinMessage, 300);
+            }
+        }
+
+        function isMovable(index) {
+            const emptyIndex = tiles.indexOf(null);
+            return getAdjacentTiles(index).includes(emptyIndex);
+        }
+
+        function isWin() {
+            return tiles.slice(0, -1).every((num, index) => num === index + 1);
+        }
+
+        function showWinMessage() {
+            document.querySelector('.final-moves').textContent = moves;
+            document.querySelector('.final-time').textContent = formatTime(seconds);
+            winMessage.style.display = 'block';
+            overlay.style.display = 'block';
+            startConfetti();
+        }
+
+        function hideWinMessage() {
+            winMessage.style.display = 'none';
+            overlay.style.display = 'none';
+            stopConfetti();
+            newGame();
+        }
+
+        // Confetti Animation Code
+        class ConfettiParticle {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * this.canvas.width;
+                this.y = Math.random() * this.canvas.height - this.canvas.height;
+                this.r = Math.random() * 4 + 1;
+                this.dx = Math.random() * 1 - 0.5;
+                this.dy = Math.random() * 1 + 3;
+                this.a = Math.random() * 360;
+                this.dr = Math.random() * 4 - 2;
+                this.colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
+                this.color = this.colors[Math.floor(Math.random() * this.colors.length)];
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.a += this.dr;
+
+                if (this.y > this.canvas.height) {
+                    this.reset();
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.a * Math.PI / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.r, -this.r, this.r * 2, this.r * 2);
+                ctx.restore();
+            }
+        }
+
+        function createConfettiAnimation() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            const particles = [];
+            const particleCount = 150;
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Create particles
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new ConfettiParticle(canvas));
+            }
+
+            function animate() {
+                if (!confetti) return;
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach(particle => {
+                    particle.update();
+                    particle.draw(ctx);
+                });
+                
+                requestAnimationFrame(animate);
+            }
+
+            return {
+                start: () => {
+                    confetti = true;
+                    animate();
+                },
+                stop: () => {
+                    confetti = false;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            };
+        }
+
+        const confettiAnimation = createConfettiAnimation();
+
+        function startConfetti() {
+            confettiAnimation.start();
+        }
+
+        function stopConfetti() {
+            confettiAnimation.stop();
+        }
+
+        function newGame() {
+            resetGameState();
+            createTiles();
+            shuffle();
+        }
+
+        // Audio Controls
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const moveSoundEffect = document.getElementById('moveSoundEffect');
+        const winSoundEffect = document.getElementById('winSoundEffect');
+        const toggleMusicBtn = document.getElementById('toggleMusic');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeIcon = document.getElementById('volumeIcon');
+
+        function toggleMusic() {
+            if (isMusicPlaying) {
+                backgroundMusic.pause();
+                toggleMusicBtn.textContent = '♫';
+            } else {
+                backgroundMusic.play();
+                toggleMusicBtn.textContent = '⏸';
+            }
+            isMusicPlaying = !isMusicPlaying;
+        }
+
+        function updateVolume() {
+            const volume = volumeSlider.value / 100;
+            backgroundMusic.volume = volume;
+            moveSoundEffect.volume = volume;
+            winSoundEffect.volume = volume;
+
+            // Update volume icon
+            if (volume === 0) {
+                volumeIcon.textContent = '🔇';
+            } else if (volume < 0.5) {
+                volumeIcon.textContent = '🔉';
+            } else {
+                volumeIcon.textContent = '🔊';
+            }
+        }
+
+        // Update the moveTile function to play sound
+        const originalMoveTile = moveTile;
+        moveTile = function(index) {
+            originalMoveTile(index);
+            moveSoundEffect.currentTime = 0;
+            moveSoundEffect.play();
+        };
+
+        // Update the showWinMessage function to play win sound
+        const originalShowWinMessage = showWinMessage;
+        showWinMessage = function() {
+            originalShowWinMessage();
+            winSoundEffect.currentTime = 0;
+            winSoundEffect.play();
+        };
+
+        // Event Listeners for audio controls
+        toggleMusicBtn.addEventListener('click', toggleMusic);
+        volumeSlider.addEventListener('input', updateVolume);
+
+        // Video background controls
+        const backgroundVideo = document.getElementById('backgroundVideo');
+        const toggleVideoBtn = document.getElementById('toggleVideo');
+
+        function toggleVideoSound() {
+            isVideoMuted = !isVideoMuted;
+            backgroundVideo.muted = isVideoMuted;
+            toggleVideoBtn.textContent = isVideoMuted ? '🔇' : '🔊';
+        }
+
+        toggleVideoBtn.addEventListener('click', toggleVideoSound);
+
+        // Set initial volume
+        updateVolume();
+
+        // Ensure video plays on mobile devices
+        document.addEventListener('touchstart', () => {
+            backgroundVideo.play();
+        }, { once: true });
+
+        // Initialize the game
+        newGame();
+
+        // Prevent zoom on double tap for touch devices
+        document.addEventListener('touchend', function(event) {
+            event.preventDefault();
+            event.target.click();
+        }, false);
+    </script>
+</body>
+</html>
